@@ -17,13 +17,22 @@ search_keywords: list = [
     "Lego 76193",
     "Lego 75324",
     "Lego 75339",
-    "Lego 75331"
+    "Lego 75331",
 ]
 max_pages: int = 1
 items_per_page: int = 120  # 60, 120, 240
 
 
-def get_number_of_search_results(soup):
+def get_number_of_search_results(soup: BeautifulSoup) -> int:
+    """
+    Extracts the number of search results from the eBay page's soup object.
+
+    Parameters:
+    - soup (BeautifulSoup): A soup object containing the parsed HTML from the eBay page.
+
+    Returns:
+    - int: The number of search results found on the page. Returns None if no results are found.
+    """
     # Find the correct <script> tag - adjust the criteria as needed for your specific case
     script_tag = soup.find("script", string=re.compile(r'"text":"\d+ results"'))
     if script_tag:
@@ -35,43 +44,95 @@ def get_number_of_search_results(soup):
     return None
 
 
-def extract_data(soup):
+def extract_data(soup: BeautifulSoup) -> list:
+    """
+    Extracts the data from the listings on an eBay page's soup object.
+
+    Parameters:
+    - soup (BeautifulSoup): A soup object containing the parsed HTML from the eBay page.
+
+    Returns:
+    - list: A list of dictionaries, each containing data about a single listing.
+    """
     listings = []
     for listing in soup.select(".s-item__wrapper"):
         # Extract various details from the listing
-        item_condition = listing.select_one(".s-item__subtitle .SECONDARY_INFO").text.strip() if listing.select_one(".s-item__subtitle .SECONDARY_INFO") else "Not specified"
-        listing_type = listing.select_one(".s-item__detail .BOLD").text.strip() if listing.select_one(".s-item__detail .BOLD") else "Not specified"
-        shipping_detail = listing.select_one(".s-item__logisticsCost").text.strip() if listing.select_one(".s-item__logisticsCost") else "Shipping details not specified"
-        price = listing.select_one(".s-item__price").text.strip() if listing.select_one(".s-item__price") else "Price not specified"
-        seller_info = listing.select_one(".s-item__seller-info-text").text.strip() if listing.select_one(".s-item__seller-info-text") else "Seller ID not specified"
+        item_condition = (
+            listing.select_one(".s-item__subtitle .SECONDARY_INFO").text.strip()
+            if listing.select_one(".s-item__subtitle .SECONDARY_INFO")
+            else "Not specified"
+        )
+        listing_type = (
+            listing.select_one(".s-item__detail .BOLD").text.strip()
+            if listing.select_one(".s-item__detail .BOLD")
+            else "Not specified"
+        )
+        shipping_detail = (
+            listing.select_one(".s-item__logisticsCost").text.strip()
+            if listing.select_one(".s-item__logisticsCost")
+            else "Shipping details not specified"
+        )
+        price = (
+            listing.select_one(".s-item__price").text.strip()
+            if listing.select_one(".s-item__price")
+            else "Price not specified"
+        )
+        seller_info = (
+            listing.select_one(".s-item__seller-info-text").text.strip()
+            if listing.select_one(".s-item__seller-info-text")
+            else "Seller ID not specified"
+        )
 
         # Process the sold date, removing the 'Sold' prefix and converting to standard format
-        sold_date_text = listing.select_one(".s-item__title--tag .POSITIVE").text.strip().replace("Sold", "").strip()
+        sold_date_text = (
+            listing.select_one(".s-item__title--tag .POSITIVE")
+            .text.strip()
+            .replace("Sold", "")
+            .strip()
+        )
         try:
-            sold_date = datetime.strptime(sold_date_text, "%d %b %Y").strftime("%Y-%m-%d")
+            sold_date = datetime.strptime(sold_date_text, "%d %b %Y").strftime(
+                "%Y-%m-%d"
+            )
         except ValueError:
             sold_date = "Invalid date format"
 
-        title = listing.select_one(".s-item__image img")["alt"].strip() if listing.select_one(".s-item__image img") else "Title not specified"
+        title = (
+            listing.select_one(".s-item__image img")["alt"].strip()
+            if listing.select_one(".s-item__image img")
+            else "Title not specified"
+        )
 
         # Append the extracted data to the listings list
-        listings.append({
-            "title": title,
-            "seller_info": seller_info,
-            "price": price,
-            "shipping_detail": shipping_detail,
-            "listing_type": listing_type,
-            "item_condition": item_condition,
-            "sold_date": sold_date,
-        })
+        listings.append(
+            {
+                "title": title,
+                "seller_info": seller_info,
+                "price": price,
+                "shipping_detail": shipping_detail,
+                "listing_type": listing_type,
+                "item_condition": item_condition,
+                "sold_date": sold_date,
+            }
+        )
     return listings
 
 
-def save_to_csv(data, filename, include_headers=True):
+def save_to_csv(data: list, filename: str, include_headers: bool = True) -> None:
+    """
+    Saves a list of dictionaries to a CSV file with the specified filename.
+
+    Parameters:
+    - data (list): A list of dictionaries, each representing data for a listing.
+    - filename (str): The name of the file to which the data will be saved.
+    - include_headers (bool): A flag indicating whether to include header rows in the CSV file.
+
+    Returns:
+    - None
+    """
+
     # Check if file exists to determine whether to write headers
     file_exists = os.path.isfile(filename)
-
-    with open(filename, "a", newline="", encoding="utf-8") as csvfile:
 
     with open(filename, "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)

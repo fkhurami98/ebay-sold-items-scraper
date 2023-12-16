@@ -3,35 +3,19 @@ import os
 import random
 import re
 import time
+from typing import Any
 import urllib.parse
 from datetime import datetime
+import pika
 from bs4 import BeautifulSoup
 import requests
+import json
 from fake_useragent import UserAgent
-
-search_keywords: list = [
-    "Lego 75280",
-    "Lego 75309",
-    "Lego 75342",
-    "Lego 10497",
-    "Lego 76193",
-    "Lego 75324",
-    "Lego 75339",
-    "Lego 75331",
-]
-max_pages: int = 1
-items_per_page: int = 120  # 60, 120, 240
 
 
 def get_number_of_search_results(soup: BeautifulSoup) -> int:
     """
     Extracts the number of search results from the eBay page's soup object.
-
-    Parameters:
-    - soup (BeautifulSoup): A soup object containing the parsed HTML from the eBay page.
-
-    Returns:
-    - int: The number of search results found on the page. Returns None if no results are found.
     """
     # Find the correct <script> tag - adjust the criteria as needed for your specific case
     script_tag = soup.find("script", string=re.compile(r'"text":"\d+ results"'))
@@ -45,18 +29,9 @@ def get_number_of_search_results(soup: BeautifulSoup) -> int:
 
 
 def extract_data(soup: BeautifulSoup) -> list:
-    """
-    Extracts the data from the listings on an eBay page's soup object.
-
-    Parameters:
-    - soup (BeautifulSoup): A soup object containing the parsed HTML from the eBay page.
-
-    Returns:
-    - list: A list of dictionaries, each containing data about a single listing.
-    """
     listings = []
+
     for listing in soup.select(".s-item__wrapper"):
-        # Extract various details from the listing
         item_condition = (
             listing.select_one(".s-item__subtitle .SECONDARY_INFO").text.strip()
             if listing.select_one(".s-item__subtitle .SECONDARY_INFO")
@@ -120,24 +95,10 @@ def extract_data(soup: BeautifulSoup) -> list:
 
 
 def save_to_csv(data: list, filename: str, include_headers: bool = True) -> None:
-    """
-    Saves a list of dictionaries to a CSV file with the specified filename.
-
-    Parameters:
-    - data (list): A list of dictionaries, each representing data for a listing.
-    - filename (str): The name of the file to which the data will be saved.
-    - include_headers (bool): A flag indicating whether to include header rows in the CSV file.
-
-    Returns:
-    - None
-    """
-
-    # Check if file exists to determine whether to write headers
-    file_exists = os.path.isfile(filename)
+    file_exists: bool = os.path.isfile(filename)
 
     with open(filename, "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
-        # Write headers only if the file is newly created
         if include_headers and not file_exists:
             writer.writerow(
                 [
@@ -164,58 +125,96 @@ def save_to_csv(data: list, filename: str, include_headers: bool = True) -> None
             )
 
 
-if __name__ == "__main__":
-    # Setup fake user agent for HTTP requests
+def start_scraping(keyword):
+    print(f"[STARTING] scraping for: {keyword}")
+
     user_agent = UserAgent()
 
-    # Iterate over each keyword to scrape data
-    for keyword in search_keywords:
-        date = datetime.now().strftime("%Y-%m-%d")
-        filename = f"ebay_data_{keyword.replace(' ', '_')}_{date}.csv"
+    max_pages: int = 1
+    items_per_page: int = 120  # 60, 120, 240
 
-        # Encode keyword for URL and setup the search URL
-        encoded_keyword = urllib.parse.quote_plus(keyword)
-        base_url = f"https://www.ebay.co.uk/sch/i.html?_from=R40&_nkw={encoded_keyword}&_sacat=0&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&_pgn=1&_ipg={items_per_page}"
-        headers = {"User-Agent": user_agent.random}
+    date: str = datetime.now().strftime("%Y-%m-%d")
 
-        # HTTP request and response parsing
-        response = requests.get(url=base_url, headers=headers)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
+    filename: str = f"ebay_data_{keyword.replace(' ', '_')}_{date}.csv"
 
-        # Calculate the number of pages to scrape based on the total search results
-        number_of_searches = get_number_of_search_results(soup)
-        print(f"[INFO] Total number of searches for '{keyword}':", number_of_searches)
+    encoded_keyword: str = urllib.parse.quote_plus(keyword)
 
-        if number_of_searches is not None:
-            max_pages = number_of_searches // items_per_page
-            max_pages = max(1, max_pages)  # Ensure at least one page
-            print(f"[INFO] Total pages to scrape for '{keyword}':", max_pages)
+    base_url: str = f"https://www.ebay.co.uk/sch/i.html?_from=R40&_nkw={encoded_keyword}&_sacat=0&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&_pgn=1&_ipg={items_per_page}"
 
-            # Scrape each page and save data to CSV
-            for page_number in range(1, max_pages + 1):
-                print(f"[WORKING] Scraping page {page_number} for {keyword}...")
+    headers = {"User-Agent": user_agent.random}
 
-                # Generate the URL for the current page
-                base_url = f"https://www.ebay.co.uk/sch/i.html?_from=R40&_nkw={encoded_keyword}&_sacat=0&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&rt=nc&_pgn={page_number}&_ipg={items_per_page}"
-                headers = {"User-Agent": user_agent.random}
-                response = requests.get(url=base_url, headers=headers)
-                response.raise_for_status()
-                soup = BeautifulSoup(response.content, "html.parser")
+    response = requests.get(url=base_url, headers=headers)
+    response.raise_for_status()
 
-                # Extract data and save to CSV
-                listings = extract_data(soup)
-                if page_number == 1:
-                    save_to_csv(listings, filename, include_headers=True)
-                else:
-                    save_to_csv(listings, filename, include_headers=False)
+    soup = BeautifulSoup(response.content, "html.parser")
 
-                print(
-                    f"[SUCCESS] Data from page {page_number} for {keyword} saved to '{filename}'."
-                )
-                time.sleep(random.uniform(1, 10))
-            print()
-        else:
+    number_of_searches: int = get_number_of_search_results(soup)
+
+    if number_of_searches is not None:
+        max_pages = min(number_of_searches // items_per_page, max_pages)
+        for page_number in range(1, max_pages + 1):
+            print(f"[WORKING] Scraping page {page_number} for {keyword}...")
+            base_url = f"https://www.ebay.co.uk/sch/i.html?_from=R40&_nkw={encoded_keyword}&_sacat=0&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&rt=nc&_pgn={page_number}&_ipg={items_per_page}"
+            headers = {"User-Agent": user_agent.random}
+            response = requests.get(url=base_url, headers=headers)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, "html.parser")
+            listings = extract_data(soup)
+            if page_number == 1:
+                save_to_csv(listings, filename, include_headers=True)
+            else:
+                save_to_csv(listings, filename, include_headers=False)
             print(
-                f"[FINISHED] Couldn't determine the number of searches for '{keyword}'. Skipping..."
+                f"[SUCCESS] Data from page {page_number} for {keyword} saved to '{filename}'.\n"
             )
+
+            time.sleep(random.uniform(1, 10))
+    else:
+        print(
+            f"[FINISHED] Couldn't determine the number of searches for '{keyword}'. Skipping..."
+        )
+
+
+def callback(ch, method, properties, body):
+    keyword = body.decode()
+    print(f"\n[RECEIVED] keyword: {keyword}")
+    try:
+        start_scraping(keyword)
+    except Exception as e:
+        print(f"Error during scraping for keyword '{keyword}': {e}")
+
+
+def main():
+    # Use the below connection object if running locally without docker
+    # connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
+
+    rabbitmq_host = os.getenv("RABBITMQ_HOST", "localhost")
+    rabbitmq_user = "user"  # Username as set in docker-compose
+    rabbitmq_password = "password"  # Password as set in docker-compose
+
+    credentials = pika.PlainCredentials(rabbitmq_user, rabbitmq_password)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host=rabbitmq_host, credentials=credentials)
+    )
+
+    channel = connection.channel()
+
+    channel.queue_declare(queue="ebay_keyword_queue")
+
+    channel.basic_consume(
+        queue="ebay_keyword_queue", on_message_callback=callback, auto_ack=True
+    )
+
+    print("Waiting for messages. To exit press CTRL+C")
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        connection.close()
+
+
+if __name__ == "__main__":
+    main()

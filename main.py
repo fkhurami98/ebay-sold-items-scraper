@@ -83,19 +83,20 @@ def extract_data(soup: BeautifulSoup) -> list:
             else "Seller ID not specified"
         )
 
-        # Process the sold date, removing the 'Sold' prefix and converting to standard format
-        sold_date_text = (
-            listing.select_one(".s-item__title--tag .POSITIVE")
-            .text.strip()
-            .replace("Sold", "")
-            .strip()
-        )
-        try:
-            sold_date = datetime.strptime(sold_date_text, "%d %b %Y").strftime(
-                "%Y-%m-%d"
-            )
-        except ValueError:
-            sold_date = "Invalid date format"
+        # Find the element that contains the sold date
+        sold_date_element = listing.select_one(".s-item__title--tag .POSITIVE")
+
+        # Check if the element exists and extract the text
+        if sold_date_element:
+            sold_date_text = sold_date_element.text.strip().replace("Sold", "").strip()
+            try:
+                sold_date = datetime.strptime(sold_date_text, "%d %b %Y").strftime(
+                    "%Y-%m-%d"
+                )
+            except ValueError:
+                sold_date = "Invalid date format"
+        else:
+            sold_date = "Not specified"
 
         title = (
             listing.select_one(".s-item__image img")["alt"].strip()
@@ -142,7 +143,6 @@ def save_to_csv(data: list, filename: str, include_headers: bool = True) -> None
                 [
                     "Title",
                     "Price",
-                    "URL",
                     "Seller Info",
                     "Shipping Detail",
                     "Listing Type",
@@ -155,7 +155,6 @@ def save_to_csv(data: list, filename: str, include_headers: bool = True) -> None
                 [
                     item["title"],
                     item["price"],
-                    item["url"],
                     item["seller_info"],
                     item["shipping_detail"],
                     item["listing_type"],
@@ -200,7 +199,7 @@ if __name__ == "__main__":
                 # Generate the URL for the current page
                 base_url = f"https://www.ebay.co.uk/sch/i.html?_from=R40&_nkw={encoded_keyword}&_sacat=0&LH_Sold=1&LH_Complete=1&LH_ItemCondition=1000&rt=nc&_pgn={page_number}&_ipg={items_per_page}"
                 headers = {"User-Agent": user_agent.random}
-                response = requests.get(url=page_url, headers=headers)
+                response = requests.get(url=base_url, headers=headers)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.content, "html.parser")
 

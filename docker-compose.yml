@@ -1,16 +1,16 @@
-version: '3.8' 
+version: '3.8'
 
 services:
   worker_one:
-    build:  
-      context: .  
-      dockerfile: Dockerfile.keyword_scraper  
-    container_name: WORKER_ONE  
-    environment:  
-      - RABBITMQ_HOST=rabbitmq  
-    depends_on:  
+    build:
+      context: .
+      dockerfile: Dockerfile.keyword_scraper
+    container_name: WORKER_ONE
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
       rabbitmq:
-        condition: service_healthy  
+        condition: service_healthy
 
   worker_two:
     build:
@@ -24,22 +24,22 @@ services:
         condition: service_healthy
 
   rabbitmq:
-    image: "rabbitmq:3-management"  
-    container_name: rabbitmq  
+    image: "rabbitmq:3.8-alpine"
+    container_name: rabbitmq
     ports:
-      - "5672:5672"  # Exposes RabbitMQ's AMQP protocol port
-      - "15672:15672"  # Exposes RabbitMQ's management UI port
+      - "5672:5672" # Exposes RabbitMQ's AMQP protocol port
+      - "15672:15672" # Exposes RabbitMQ's management UI port
     volumes:
       - "rabbitmq_data:/var/lib/rabbitmq"
-    environment:  
-      - RABBITMQ_DEFAULT_USER=user  # Default username
-      - RABBITMQ_DEFAULT_PASS=password  # Default password
+    environment:
+      - RABBITMQ_DEFAULT_USER=user # Default username
+      - RABBITMQ_DEFAULT_PASS=password # Default password
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
-      interval: 2s  # Time between running the health check
-      timeout: 5s  # Maximum time to wait for the health check to run
-      retries: 5  # Number of retries before considering the service unhealthy
-  
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 2s # Time between running the health check
+      timeout: 5s # Maximum time to wait for the health check to run
+      retries: 5 # Number of retries before considering the service unhealthy
+
   postgres_db:
     image: postgres:latest
     container_name: postgres_db
@@ -53,8 +53,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - "./db/init.sql:/docker-entrypoint-initdb.d/init.sql"
 
-
 volumes:
-  rabbitmq_data:  # Defines a volume for storing RabbitMQ data
+  rabbitmq_data: # Defines a volume for storing RabbitMQ data
   postgres_data:
+
 

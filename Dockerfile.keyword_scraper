@@ -1,10 +1,16 @@
 FROM python:3.9
 
-WORKDIR /app
+WORKDIR /scraper
 
-COPY app/keyword_scraper.py /app
-COPY requirements.txt /app
+COPY app/keyword_scraper.py /scraper/app/keyword_scraper.py
+COPY app/__init__.py /scraper/app/__init__.py
+COPY app/settings.py /scraper/app/settings.py
+
+
+COPY requirements.txt /scraper
+
+COPY db/ /scraper/db
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "./keyword_scraper.py"]
+CMD ["python", "-u", "/scraper/app/keyword_scraper.py"]

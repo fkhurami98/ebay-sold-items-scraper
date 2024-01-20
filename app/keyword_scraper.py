@@ -3,14 +3,17 @@ import os
 import random
 import re
 import time
-from typing import Any
 import urllib.parse
 from datetime import datetime
 import pika
 from bs4 import BeautifulSoup
 import requests
-import json
 from fake_useragent import UserAgent
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from db.db_utils import insert_data
 
 
 def get_number_of_search_results(soup: BeautifulSoup) -> int:
@@ -160,6 +163,7 @@ def start_scraping(keyword):
             response.raise_for_status()
             soup = BeautifulSoup(response.content, "html.parser")
             listings = extract_data(soup)
+            # insert_data(listings)
             if page_number == 1:
                 save_to_csv(listings, filename, include_headers=True)
             else:
